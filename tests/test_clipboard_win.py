@@ -163,3 +163,52 @@ class TestWriteToClipboard:
             clipboard_win.write_to_clipboard(path)
 
         win_api['u32'].CloseClipboard.assert_called_once()
+
+
+class TestWriteUt16:
+    def test_custom_menu_triggers_ut16_path(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        xml = '<fmxmlsnippet><CustomMenu name="MyMenu"/></fmxmlsnippet>'
+        f = tmp_path / 'menu.xml'
+        f.write_text(xml, encoding='utf-8')
+
+        ut16_called = []
+        monkeypatch.setattr(clipboard_win, '_write_ut16_to_clipboard',
+                            lambda text, path: ut16_called.append(True))
+
+        clipboard_win.write_to_clipboard(str(f))
+        assert ut16_called == [True]
+
+    def test_ut16_encodes_as_utf16_with_bom(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        xml = '<fmxmlsnippet><CustomMenu name="MyMenu"/></fmxmlsnippet>'
+
+        captured = []
+        original = clipboard_win._write_bytes_to_clipboard
+
+        def capture(fmt_id, data):
+            captured.append(data)
+            return original(fmt_id, data)
+
+        monkeypatch.setattr(clipboard_win, '_write_bytes_to_clipboard', capture)
+
+        f = tmp_path / 'menu.xml'
+        f.write_text(xml, encoding='utf-8')
+        clipboard_win._write_ut16_to_clipboard(xml, str(f))
+
+        assert len(captured) == 1
+        # UTF-16 BOM is either FF FE (LE) or FE FF (BE)
+        assert captured[0][:2] in (b'\xff\xfe', b'\xfe\xff')
+
+    def test_ut16_strips_xml_declaration(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        xml = '<?xml version="1.0"?>\n<fmxmlsnippet><CustomMenu/></fmxmlsnippet>'
+
+        captured = []
+        monkeypatch.setattr(clipboard_win, '_write_bytes_to_clipboard',
+                            lambda fmt_id, data: captured.append(data))
+
+        clipboard_win._write_ut16_to_clipboard(xml, 'test.xml')
+
+        decoded = captured[0].decode('utf-16')
+        assert '<?xml' not in decoded

@@ -188,3 +188,17 @@ def write_to_clipboard(input_path: str, cls: str | None = None) -> None:
 
     _write_bytes_to_clipboard(format_id, raw_bytes)
     print(f"Clipboard ready → {input_path} as {cls} ({FM_CLASSES[cls]})", file=sys.stderr)
+
+
+def _write_ut16_to_clipboard(xml_text: str, input_path: str) -> None:
+    """Write a menu XML string to the clipboard as UTF-16 Unicode text."""
+    # Strip XML declaration — FileMaker expects a clean UTF-16 payload
+    xml_text = re.sub(r'<\?xml[^?]*\?>\s*', '', xml_text, count=1)
+    utf16_bytes = xml_text.encode('utf-16')  # includes BOM automatically
+
+    format_id = _user32.RegisterClipboardFormatW('ut16')
+    if not format_id:
+        _fail(f"RegisterClipboardFormat('ut16') failed (error {_last_error()})")
+
+    _write_bytes_to_clipboard(format_id, utf16_bytes)
+    print(f"Clipboard ready → {input_path} as ut16 (Menu)", file=sys.stderr)
