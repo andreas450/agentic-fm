@@ -202,3 +202,74 @@ def _write_ut16_to_clipboard(xml_text: str, input_path: str) -> None:
 
     _write_bytes_to_clipboard(format_id, utf16_bytes)
     print(f"Clipboard ready → {input_path} as ut16 (Menu)", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Read command
+# ---------------------------------------------------------------------------
+
+def _read_bytes_from_clipboard(format_id: int) -> bytes:
+    """Read raw bytes for a given format ID from the Windows clipboard."""
+    if not _user32.OpenClipboard(None):
+        _fail(f"OpenClipboard failed (error {_last_error()}) — clipboard may be locked")
+
+    try:
+        h_mem = _user32.GetClipboardData(format_id)
+        if not h_mem:
+            _fail("No data for the requested clipboard format")
+
+        size = _kernel32.GlobalSize(h_mem)
+        ptr = _kernel32.GlobalLock(h_mem)
+        if not ptr:
+            _fail(f"GlobalLock failed (error {_last_error()})")
+
+        try:
+            data = ctypes.string_at(ptr, size)
+        finally:
+            _kernel32.GlobalUnlock(h_mem)
+
+        return data
+    finally:
+        _user32.CloseClipboard()
+
+
+def _detect_fm_format_on_clipboard() -> tuple | None:
+    """Enumerate clipboard formats and return (format_id, class_code) for the first FM format found."""
+    if not _user32.OpenClipboard(None):
+        _fail(f"OpenClipboard failed (error {_last_error()})")
+
+    try:
+        fmt = _user32.EnumClipboardFormats(0)
+        while fmt:
+            name_buf = ctypes.create_unicode_buffer(256)
+            _user32.GetClipboardFormatNameW(fmt, name_buf, 256)
+            name = name_buf.value
+            if name in FM_CLASSES or name in UT16_CLASSES:
+                return fmt, name
+            fmt = _user32.EnumClipboardFormats(fmt)
+    finally:
+        _user32.CloseClipboard()
+
+    return None
+
+
+def read_from_clipboard(output_path: str) -> None:
+    """Read FM objects from the Windows clipboard and save as XML."""
+    found = _detect_fm_format_on_clipboard()
+    if not found:
+        _fail("No FileMaker objects found on clipboard. "
+              "Copy a script or object in FileMaker first (Ctrl+A, Ctrl+C).")
+
+    format_id, cls = found
+    data = _read_bytes_from_clipboard(format_id)
+
+    if cls in UT16_CLASSES:
+        xml = data.decode('utf-16')
+    else:
+        xml = data.decode('utf-8')
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(xml)
+
+    label = FM_CLASSES.get(cls, cls)
+    print(f"Saved {cls} ({label}) to {output_path}", file=sys.stderr)

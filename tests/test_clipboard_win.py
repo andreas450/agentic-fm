@@ -217,3 +217,71 @@ class TestWriteUt16:
 
         decoded = captured[0].decode('utf-16')
         assert '<?xml' not in decoded
+
+
+class TestReadFromClipboard:
+    SAMPLE_XML = b'<fmxmlsnippet type="FMObjectList"><Step id="89"/></fmxmlsnippet>'
+
+    @pytest.fixture(autouse=True)
+    def setup_read_mocks(self, win_api, monkeypatch):
+        import clipboard_win
+        self.cw = clipboard_win
+        self.u32 = win_api['u32']
+        self.k32 = win_api['k32']
+
+        # EnumClipboardFormats: return XMSS format ID then 0 (done)
+        self.u32.EnumClipboardFormats.side_effect = [0xC123, 0]
+
+        # GetClipboardFormatNameW fills the buffer with 'XMSS'
+        def fill_name(fmt, buf, size):
+            buf.value = 'XMSS'
+            return 4
+        self.u32.GetClipboardFormatNameW.side_effect = fill_name
+
+        self.u32.GetClipboardData.return_value = 0xDEAD
+        self.k32.GlobalSize.return_value = len(self.SAMPLE_XML)
+        self.k32.GlobalLock.return_value = 0xBEEF
+        self.k32.GlobalUnlock.return_value = 1
+
+        monkeypatch.setattr(clipboard_win.ctypes, 'string_at',
+                            MagicMock(return_value=self.SAMPLE_XML))
+
+    def test_read_opens_and_closes_clipboard(self, tmp_path):
+        out = tmp_path / 'out.xml'
+        self.cw.read_from_clipboard(str(out))
+        self.u32.OpenClipboard.assert_called()
+        self.u32.CloseClipboard.assert_called()
+
+    def test_read_writes_xml_bytes_to_output_file(self, tmp_path):
+        out = tmp_path / 'out.xml'
+        self.cw.read_from_clipboard(str(out))
+        assert out.read_bytes() == self.SAMPLE_XML
+
+    def test_read_exits_when_no_fm_format_on_clipboard(self, tmp_path, monkeypatch):
+        import clipboard_win
+        # EnumClipboardFormats returns only a non-FM format
+        self.u32.EnumClipboardFormats.side_effect = [0xC999, 0]
+        def fill_unknown(fmt, buf, size):
+            buf.value = 'SomeOtherApp'
+            return 12
+        self.u32.GetClipboardFormatNameW.side_effect = fill_unknown
+
+        out = tmp_path / 'out.xml'
+        with pytest.raises(SystemExit):
+            clipboard_win.read_from_clipboard(str(out))
+
+    def test_read_close_called_even_on_error(self, tmp_path, monkeypatch):
+        import clipboard_win
+        self.u32.GetClipboardData.return_value = 0  # no data
+        self.u32.EnumClipboardFormats.side_effect = [0xC123, 0]
+
+        def fill_fm(fmt, buf, size):
+            buf.value = 'XMSS'
+            return 4
+        self.u32.GetClipboardFormatNameW.side_effect = fill_fm
+
+        out = tmp_path / 'out.xml'
+        with pytest.raises(SystemExit):
+            clipboard_win.read_from_clipboard(str(out))
+
+        self.u32.CloseClipboard.assert_called()
