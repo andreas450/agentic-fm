@@ -142,7 +142,7 @@ def _write_bytes_to_clipboard(format_id: int, data: bytes) -> None:
 def _last_error() -> int:
     """Return the last Windows error code, or 0 on non-Windows."""
     if sys.platform == 'win32':
-        return _last_error()  # type: ignore[attr-defined]
+        return ctypes.get_last_error()  # type: ignore[attr-defined]
     return 0
 
 
