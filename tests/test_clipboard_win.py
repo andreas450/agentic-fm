@@ -284,4 +284,4 @@ class TestReadFromClipboard:
         with pytest.raises(SystemExit):
             clipboard_win.read_from_clipboard(str(out))
 
-        self.u32.CloseClipboard.assert_called()
+        assert self.u32.CloseClipboard.call_count == 2

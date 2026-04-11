@@ -266,7 +266,7 @@ def read_from_clipboard(output_path: str) -> None:
     if cls in UT16_CLASSES:
         xml = data.decode('utf-16')
     else:
-        xml = data.decode('utf-8')
+        xml = data.decode('utf-8', errors='replace')
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(xml)
