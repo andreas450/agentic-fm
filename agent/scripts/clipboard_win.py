@@ -99,3 +99,92 @@ def detect_class_from_xml(xml_text: str) -> str:
         if re.search(rf'<{element}[\s>/]', xml_text):
             return cls
     return 'XMSS'
+
+
+# ---------------------------------------------------------------------------
+# Low-level clipboard I/O
+# ---------------------------------------------------------------------------
+
+def _write_bytes_to_clipboard(format_id: int, data: bytes) -> None:
+    """Write raw bytes to the Windows clipboard under the given format ID."""
+    h_mem = _kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
+    if not h_mem:
+        _fail(f"GlobalAlloc failed (error {_last_error()})")
+
+    ptr = _kernel32.GlobalLock(h_mem)
+    if not ptr:
+        _kernel32.GlobalFree(h_mem)
+        _fail(f"GlobalLock failed (error {_last_error()})")
+
+    ctypes.memmove(ptr, data, len(data))
+    _kernel32.GlobalUnlock(h_mem)
+
+    # Retry once if clipboard is locked by another process
+    if not _user32.OpenClipboard(None):
+        time.sleep(0.1)
+        if not _user32.OpenClipboard(None):
+            _kernel32.GlobalFree(h_mem)
+            _fail(f"OpenClipboard failed (error {_last_error()}) — clipboard may be locked by another app")
+
+    windows_owns_mem = False
+    try:
+        _user32.EmptyClipboard()
+        result = _user32.SetClipboardData(format_id, h_mem)
+        if not result:
+            _fail(f"SetClipboardData failed (error {_last_error()})")
+        windows_owns_mem = True
+    finally:
+        _user32.CloseClipboard()
+        if not windows_owns_mem:
+            _kernel32.GlobalFree(h_mem)
+
+
+def _last_error() -> int:
+    """Return the last Windows error code, or 0 on non-Windows."""
+    if sys.platform == 'win32':
+        return _last_error()  # type: ignore[attr-defined]
+    return 0
+
+
+def _fail(msg: str) -> None:
+    """Print error to stderr and exit with code 1."""
+    print(f"ERROR: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def _decode_file(raw_bytes: bytes) -> str:
+    """Decode file bytes, honouring a UTF-16 BOM if present."""
+    if raw_bytes[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        return raw_bytes.decode('utf-16')
+    return raw_bytes.decode('utf-8', errors='replace')
+
+
+# ---------------------------------------------------------------------------
+# Write command
+# ---------------------------------------------------------------------------
+
+def write_to_clipboard(input_path: str, cls: str | None = None) -> None:
+    """Write an fmxmlsnippet XML file to the Windows clipboard as FM objects."""
+    with open(input_path, 'rb') as f:
+        raw_bytes = f.read()
+
+    xml_text = _decode_file(raw_bytes)
+
+    if cls is None:
+        cls = detect_class_from_xml(xml_text)
+
+    cls = cls.lower() if cls.lower() in UT16_CLASSES else cls.upper()
+
+    if cls in UT16_CLASSES:
+        _write_ut16_to_clipboard(xml_text, input_path)
+        return
+
+    if cls not in FM_CLASSES:
+        _fail(f"Unknown class '{cls}'. Valid options: {', '.join(FM_CLASSES)}")
+
+    format_id = _user32.RegisterClipboardFormatW(cls)
+    if not format_id:
+        _fail(f"RegisterClipboardFormat('{cls}') failed (error {_last_error()})")
+
+    _write_bytes_to_clipboard(format_id, raw_bytes)
+    print(f"Clipboard ready → {input_path} as {cls} ({FM_CLASSES[cls]})", file=sys.stderr)
