@@ -56,6 +56,10 @@ class TestDetectClassFromXml:
         xml = '<fmxmlsnippet><Step/></fmxmlsnippet>'
         assert self.detect(xml) == 'XMSS'
 
+    def test_empty_snippet_defaults_to_xmss(self):
+        xml = '<fmxmlsnippet/>'
+        assert self.detect(xml) == 'XMSS'
+
 
 # ---------------------------------------------------------------------------
 # Shared fixture for mocking Windows API
@@ -163,6 +167,7 @@ class TestWriteToClipboard:
             clipboard_win.write_to_clipboard(path)
 
         win_api['u32'].CloseClipboard.assert_called_once()
+        win_api['k32'].GlobalFree.assert_called_once()
 
 
 class TestWriteUt16:
