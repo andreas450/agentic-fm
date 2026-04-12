@@ -253,6 +253,19 @@ def detect_class_from_xml(xml_text):
 
 def read_from_clipboard(output_path=None):
     """Extract FM objects from clipboard and output as formatted XML."""
+    # Windows and WSL: delegate to clipboard_win.py
+    if _is_windows() or _is_wsl():
+        if output_path is None:
+            print('ERROR: output path required on Windows/WSL', file=sys.stderr)
+            sys.exit(1)
+        result = _call_win(['read', output_path])
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            sys.exit(1)
+        if result.stdout:
+            print(result.stdout, end='')
+        return
+    # macOS path continues below — no changes needed
     cls = detect_clipboard_class()
     if not cls:
         print('ERROR: No FileMaker objects found on clipboard.', file=sys.stderr)
@@ -355,6 +368,19 @@ def _decode_file(raw_bytes):
 
 def write_to_clipboard(input_path, cls=None):
     """Write an fmxmlsnippet XML file to the clipboard as FM objects."""
+    # Windows and WSL: delegate to clipboard_win.py
+    if _is_windows() or _is_wsl():
+        args = ['write', input_path]
+        if cls:
+            args += ['--class', cls]
+        result = _call_win(args)
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            sys.exit(1)
+        if result.stdout:
+            print(result.stdout, end='')
+        return
+    # macOS path continues below — no changes needed
     with open(input_path, 'rb') as f:
         raw_bytes = f.read()
 

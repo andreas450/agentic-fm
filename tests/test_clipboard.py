@@ -145,3 +145,88 @@ class TestCallWin:
             assert any('\\' in a for a in call_args)
         finally:
             os.unlink(tf_path)
+
+
+class TestDelegation:
+    """Verify clipboard.py delegates to clipboard_win.py on Windows and WSL."""
+
+    def _make_xml_file(self, tmp_path):
+        xml = '<fmxmlsnippet type="FMObjectList"><Step id="89"/></fmxmlsnippet>'
+        f = tmp_path / 'test.xml'
+        f.write_text(xml, encoding='utf-8')
+        return str(f)
+
+    def test_write_delegates_on_windows(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+
+        called = []
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: called.append(args) or MagicMock(returncode=0, stdout='', stderr=''))
+
+        clipboard.write_to_clipboard(self._make_xml_file(tmp_path))
+        assert len(called) == 1
+        assert called[0][0] == 'write'
+
+    def test_write_delegates_on_wsl(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'linux')
+        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
+
+        called = []
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: called.append(args) or MagicMock(returncode=0, stdout='', stderr=''))
+
+        clipboard.write_to_clipboard(self._make_xml_file(tmp_path))
+        assert len(called) == 1
+        assert called[0][0] == 'write'
+
+    def test_write_passes_class_arg_when_provided(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+
+        called = []
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: called.append(args) or MagicMock(returncode=0, stdout='', stderr=''))
+
+        clipboard.write_to_clipboard(self._make_xml_file(tmp_path), cls='XMSC')
+        assert '--class' in called[0]
+        assert 'XMSC' in called[0]
+
+    def test_write_exits_when_call_win_fails(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: MagicMock(returncode=1, stdout='', stderr='ERROR: test failure'))
+
+        with pytest.raises(SystemExit):
+            clipboard.write_to_clipboard(self._make_xml_file(tmp_path))
+
+    def test_read_delegates_on_windows(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+
+        called = []
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: called.append(args) or MagicMock(returncode=0, stdout='', stderr=''))
+
+        out = str(tmp_path / 'out.xml')
+        clipboard.read_from_clipboard(out)
+        assert len(called) == 1
+        assert called[0][0] == 'read'
+
+    def test_macos_path_not_affected(self, monkeypatch, tmp_path):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'darwin')
+        monkeypatch.setattr(clipboard, '_is_wsl', lambda: False)
+
+        call_win_called = []
+        monkeypatch.setattr(clipboard, '_call_win',
+                            lambda args: call_win_called.append(args))
+
+        monkeypatch.setattr(clipboard, 'detect_class_from_xml', lambda x: 'XMSS')
+        monkeypatch.setattr(clipboard, '_nspasteboard_write', lambda cls, data: True)
+        clipboard._HAS_APPKIT = True
+
+        clipboard.write_to_clipboard(self._make_xml_file(tmp_path))
+        assert call_win_called == []
