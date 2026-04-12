@@ -333,3 +333,81 @@ class TestDiscover:
         self.cw.discover()
         out = capsys.readouterr().out
         assert 'No' in out or 'no' in out or 'empty' in out.lower()
+
+
+class TestErrorHandling:
+    def _xml_file(self, tmp_path):
+        xml = '<fmxmlsnippet type="FMObjectList"><Step id="89"/></fmxmlsnippet>'
+        f = tmp_path / 'test.xml'
+        f.write_text(xml, encoding='utf-8')
+        return str(f)
+
+    def test_write_exits_when_global_alloc_fails(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        win_api['k32'].GlobalAlloc.return_value = 0  # failure
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+    def test_write_exits_when_open_clipboard_fails(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        win_api['u32'].OpenClipboard.return_value = 0  # failure
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+    def test_write_frees_memory_when_open_clipboard_fails(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        win_api['u32'].OpenClipboard.return_value = 0  # failure
+
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+        win_api['k32'].GlobalFree.assert_called_once_with(0xDEAD)
+
+    def test_write_frees_memory_when_set_clipboard_data_fails(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        win_api['u32'].SetClipboardData.return_value = 0  # failure
+
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+        win_api['k32'].GlobalFree.assert_called_once_with(0xDEAD)
+
+    def test_write_does_not_free_memory_on_success(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+        win_api['k32'].GlobalFree.assert_not_called()
+
+    def test_write_rejects_unknown_class(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path), cls='BOGUS')
+
+    def test_write_retries_once_when_open_clipboard_locked(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        monkeypatch.setattr(clipboard_win.time, 'sleep', MagicMock())
+
+        # First OpenClipboard call fails (locked), second succeeds
+        win_api['u32'].OpenClipboard.side_effect = [0, 1]
+
+        clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+        assert win_api['u32'].OpenClipboard.call_count == 2
+
+    def test_write_fails_after_two_locked_attempts(self, win_api, tmp_path, monkeypatch):
+        import clipboard_win
+        monkeypatch.setattr(clipboard_win.ctypes, 'memmove', MagicMock())
+        monkeypatch.setattr(clipboard_win.time, 'sleep', MagicMock())
+
+        win_api['u32'].OpenClipboard.return_value = 0  # always fails
+
+        with pytest.raises(SystemExit):
+            clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
+
+        assert win_api['u32'].OpenClipboard.call_count == 2
