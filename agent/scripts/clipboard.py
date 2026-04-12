@@ -29,6 +29,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -46,6 +47,52 @@ def _is_wsl() -> bool:
 def _is_windows() -> bool:
     """Return True when running natively on Windows."""
     return sys.platform == 'win32'
+
+
+def _call_win(args: list) -> 'subprocess.CompletedProcess':
+    """Call clipboard_win.py via Windows Python.
+
+    On win32: use sys.executable (already Windows Python).
+    On WSL:   convert paths with wslpath, invoke via python.exe interop.
+    """
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'clipboard_win.py')
+
+    if _is_windows():
+        return subprocess.run(
+            [sys.executable, script] + args,
+            capture_output=True, text=True,
+        )
+
+    # WSL path: convert script and any POSIX file-path args to Windows paths
+    try:
+        win_script = subprocess.check_output(['wslpath', '-w', script]).decode().strip()
+    except subprocess.CalledProcessError:
+        print(f"ERROR: Path conversion failed for: {script}", file=sys.stderr)
+        sys.exit(1)
+
+    win_args = []
+    for a in args:
+        if a.startswith('/') and os.path.exists(a):
+            try:
+                win_args.append(subprocess.check_output(['wslpath', '-w', a]).decode().strip())
+            except subprocess.CalledProcessError:
+                print(f"ERROR: Path conversion failed for: {a}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            win_args.append(a)
+
+    try:
+        return subprocess.run(
+            ['python.exe', win_script] + win_args,
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        print(
+            "ERROR: Windows Python not found — verify with `python.exe --version` from WSL.\n"
+            "       Ensure Python is installed on Windows and its directory is in the Windows PATH.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 # Optional fast path: PyObjC (pyobjc-framework-Cocoa) lets us read/write the

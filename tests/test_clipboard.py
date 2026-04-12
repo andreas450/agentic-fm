@@ -44,3 +44,107 @@ class TestIsWindows:
         import clipboard
         monkeypatch.setattr(sys, 'platform', 'darwin')
         assert clipboard._is_windows() is False
+
+
+from unittest.mock import MagicMock, call
+import subprocess
+
+
+class TestCallWin:
+    def _get_win_script_path(self):
+        """Return the expected path to clipboard_win.py."""
+        import clipboard
+        import os
+        return os.path.join(os.path.dirname(clipboard.__file__), 'clipboard_win.py')
+
+    def test_on_windows_uses_sys_executable(self, monkeypatch):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr(subprocess, 'run', mock_run)
+
+        clipboard._call_win(['write', 'C:\\some\\file.xml'])
+
+        call_args = mock_run.call_args[0][0]
+        assert call_args[0] == sys.executable
+
+    def test_on_windows_passes_args_unchanged(self, monkeypatch):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'win32')
+
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr(subprocess, 'run', mock_run)
+
+        clipboard._call_win(['write', 'C:\\some\\file.xml'])
+
+        call_args = mock_run.call_args[0][0]
+        assert 'write' in call_args
+        assert 'C:\\some\\file.xml' in call_args
+
+    def test_on_wsl_uses_python_exe(self, monkeypatch):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'linux')
+        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
+
+        def fake_check_output(cmd, **kw):
+            if '-w' in cmd:
+                path = cmd[-1]
+                return f'C:\\wsl{path.replace("/", "\\")}\n'.encode()
+            return b''
+
+        monkeypatch.setattr(subprocess, 'check_output', fake_check_output)
+        mock_run = MagicMock(return_value=MagicMock(returncode=0))
+        monkeypatch.setattr(subprocess, 'run', mock_run)
+
+        clipboard._call_win(['write', '/home/user/file.xml'])
+
+        call_args = mock_run.call_args[0][0]
+        assert call_args[0] == 'python.exe'
+
+    def test_on_wsl_raises_clear_error_when_python_exe_not_found(self, monkeypatch):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'linux')
+        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
+
+        def fake_check_output(cmd, **kw):
+            if '-w' in cmd:
+                return b'C:\\path\\clipboard_win.py\n'
+            return b''
+        monkeypatch.setattr(subprocess, 'check_output', fake_check_output)
+        monkeypatch.setattr(subprocess, 'run', MagicMock(side_effect=FileNotFoundError))
+
+        with pytest.raises(SystemExit):
+            clipboard._call_win(['write', 'test.xml'])
+
+    def test_on_wsl_converts_posix_paths_to_windows(self, monkeypatch):
+        import clipboard
+        monkeypatch.setattr(sys, 'platform', 'linux')
+        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
+
+        converted = {}
+
+        def fake_check_output(cmd, **kw):
+            if '-w' in cmd:
+                posix = cmd[-1]
+                win = f'C:\\Users\\user\\{posix.split("/")[-1]}'
+                converted[posix] = win
+                return (win + '\n').encode()
+            return b''
+
+        monkeypatch.setattr(subprocess, 'check_output', fake_check_output)
+
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as tf:
+            tf_path = tf.name
+
+        try:
+            mock_run = MagicMock(return_value=MagicMock(returncode=0))
+            monkeypatch.setattr(subprocess, 'run', mock_run)
+
+            clipboard._call_win(['write', tf_path])
+
+            call_args = mock_run.call_args[0][0]
+            assert any('\\' in a for a in call_args)
+        finally:
+            os.unlink(tf_path)
