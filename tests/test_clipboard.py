@@ -226,7 +226,7 @@ class TestDelegation:
 
         monkeypatch.setattr(clipboard, 'detect_class_from_xml', lambda x: 'XMSS')
         monkeypatch.setattr(clipboard, '_nspasteboard_write', lambda cls, data: True)
-        clipboard._HAS_APPKIT = True
+        monkeypatch.setattr(clipboard, '_HAS_APPKIT', True)
 
         clipboard.write_to_clipboard(self._make_xml_file(tmp_path))
         assert call_win_called == []
