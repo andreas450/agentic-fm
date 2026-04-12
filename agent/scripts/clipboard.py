@@ -34,6 +34,20 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
+
+def _is_wsl() -> bool:
+    """Return True when running inside Windows Subsystem for Linux."""
+    try:
+        return 'microsoft' in open('/proc/version').read().lower()
+    except OSError:
+        return False
+
+
+def _is_windows() -> bool:
+    """Return True when running natively on Windows."""
+    return sys.platform == 'win32'
+
+
 # Optional fast path: PyObjC (pyobjc-framework-Cocoa) lets us read/write the
 # clipboard via NSPasteboard directly, bypassing osascript subprocesses and the
 # hex-decode round-trip.  Falls back to the osascript path when not installed.
