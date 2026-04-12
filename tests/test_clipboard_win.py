@@ -285,3 +285,51 @@ class TestReadFromClipboard:
             clipboard_win.read_from_clipboard(str(out))
 
         assert self.u32.CloseClipboard.call_count == 2
+
+
+class TestDiscover:
+    @pytest.fixture(autouse=True)
+    def setup(self, win_api, monkeypatch):
+        import clipboard_win
+        self.cw = clipboard_win
+        self.u32 = win_api['u32']
+        self.k32 = win_api['k32']
+
+        # Single custom format: XMSC with sample FM XML bytes
+        self.u32.EnumClipboardFormats.side_effect = [0xC123, 0]
+
+        def fill_name(fmt, buf, size):
+            buf.value = 'XMSC'
+            return 4
+        self.u32.GetClipboardFormatNameW.side_effect = fill_name
+
+        self.u32.GetClipboardData.return_value = 0xDEAD
+        self.k32.GlobalSize.return_value = 20
+        self.k32.GlobalLock.return_value = 0xBEEF
+        self.k32.GlobalUnlock.return_value = 1
+
+        sample = b'<?fmxmlsnippet'
+        monkeypatch.setattr(clipboard_win.ctypes, 'string_at',
+                            MagicMock(return_value=sample))
+
+    def test_discover_prints_format_name(self, capsys):
+        self.cw.discover()
+        out = capsys.readouterr().out
+        assert 'XMSC' in out
+
+    def test_discover_prints_format_id(self, capsys):
+        self.cw.discover()
+        out = capsys.readouterr().out
+        assert 'C123' in out.upper()
+
+    def test_discover_marks_known_fm_formats(self, capsys):
+        self.cw.discover()
+        out = capsys.readouterr().out
+        # FM formats should be marked distinctly (e.g. with * or label)
+        assert 'Script' in out or '*' in out
+
+    def test_discover_prints_no_formats_message_when_clipboard_empty(self, capsys):
+        self.u32.EnumClipboardFormats.side_effect = [0]  # nothing
+        self.cw.discover()
+        out = capsys.readouterr().out
+        assert 'No' in out or 'no' in out or 'empty' in out.lower()

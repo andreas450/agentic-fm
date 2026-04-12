@@ -273,3 +273,55 @@ def read_from_clipboard(output_path: str) -> None:
 
     label = FM_CLASSES.get(cls, cls)
     print(f"Saved {cls} ({label}) to {output_path}", file=sys.stderr)
+
+
+def discover() -> None:
+    """Enumerate custom clipboard formats and identify FM entries."""
+    if not _user32.OpenClipboard(None):
+        _fail(f"OpenClipboard failed (error {_last_error()})")
+
+    formats = []
+    try:
+        fmt = _user32.EnumClipboardFormats(0)
+        while fmt:
+            if fmt > 0xC000:  # Only custom formats (RegisterClipboardFormat range)
+                name_buf = ctypes.create_unicode_buffer(256)
+                _user32.GetClipboardFormatNameW(fmt, name_buf, 256)
+                name = name_buf.value
+
+                preview = ''
+                h_mem = _user32.GetClipboardData(fmt)
+                if h_mem:
+                    size = min(_kernel32.GlobalSize(h_mem), 20)
+                    ptr = _kernel32.GlobalLock(h_mem)
+                    if ptr:
+                        try:
+                            raw = ctypes.string_at(ptr, size)
+                            preview = raw.hex()[:40]
+                            try:
+                                text = raw.decode('utf-8', errors='replace').replace('\n', ' ')
+                                preview += f'  ({text[:30]})'
+                            except Exception:
+                                pass
+                        finally:
+                            _kernel32.GlobalUnlock(h_mem)
+
+                formats.append((fmt, name, preview))
+            fmt = _user32.EnumClipboardFormats(fmt)
+    finally:
+        _user32.CloseClipboard()
+
+    if not formats:
+        print("No custom clipboard formats found. Copy something in FileMaker first.")
+        return
+
+    print(f"{'ID':<12} {'Name':<20} Preview")
+    print('-' * 72)
+    for fmt_id, name, preview in formats:
+        is_fm = name in FM_CLASSES or name in UT16_CLASSES
+        label = f" ({FM_CLASSES[name]})" if name in FM_CLASSES else (' (Menu)' if name in UT16_CLASSES else '')
+        print(f"0x{fmt_id:04X}{'':8} {name:<20} {preview}")
+        if is_fm:
+            print(f"  ^ FileMaker format{label} *")
+
+    print("\n* = Known FileMaker format — use this name with --class if needed")
