@@ -196,3 +196,75 @@ Note that `pb.clearContents()` is required before writing — without it, stale 
 ## Reference
 
 The approach above is derived from [FmClipTools](https://github.com/DanShockley/FmClipTools) by Daniel A. Shockley and Erik Shagdar, which provides a complete AppleScript library for FileMaker clipboard operations including batch conversion, prettifying, and class detection.
+
+---
+
+## Windows and WSL support
+
+`clipboard.py` automatically detects the runtime environment and delegates to
+`clipboard_win.py` on Windows and WSL. No configuration is required.
+
+| Environment | Detection | Handler |
+|---|---|---|
+| macOS | `sys.platform == 'darwin'` | `osascript` / `NSPasteboard` (existing) |
+| Windows (VS Code native) | `sys.platform == 'win32'` | `clipboard_win.py` via `sys.executable` |
+| WSL (Cursor, Claude Code) | `/proc/version` contains `microsoft` | `clipboard_win.py` via `python.exe` interop |
+
+All existing call sites (`companion_server.py`, `deploy.py`, webviewer) require no changes.
+
+### Prerequisites
+
+- **Windows Python** must be installed and accessible. Verify from a WSL terminal:
+  ```bash
+  python.exe --version
+  ```
+- On WSL, `python.exe` is available when Windows Python is in the Windows PATH and
+  WSL interop is enabled (default on Windows 11).
+
+### One-time: discover FileMaker's clipboard format name
+
+Before first use, confirm the format name FileMaker registers on your Windows installation:
+
+1. In FileMaker Script Workspace, select all steps (`Ctrl+A`) and copy (`Ctrl+C`)
+2. Run from any terminal (Windows cmd, PowerShell, or WSL):
+   ```
+   python.exe agent/scripts/clipboard_win.py discover
+   ```
+3. Expected output:
+   ```
+   ID            Name                 Preview
+   ────────────────────────────────────────────────────────────────────────
+   0xC123        XMSC                 3c666d786d6c736e697070657...  (<?fmxmlsnip...)
+     ^ FileMaker format (Script) *
+
+   * = Known FileMaker format — use this name with --class if needed
+   ```
+4. If format names differ from the 4-letter codes, pass `--class <name>` when calling
+   `write` or `read` directly.
+
+### Calling `clipboard_win.py` directly
+
+On Windows, `clipboard_win.py` can be called directly by Windows Python:
+
+```
+python.exe agent\scripts\clipboard_win.py discover
+python.exe agent\scripts\clipboard_win.py write agent\sandbox\myscript.xml
+python.exe agent\scripts\clipboard_win.py read agent\sandbox\output.xml
+```
+
+From WSL (paths converted automatically):
+
+```bash
+python3 agent/scripts/clipboard.py write agent/sandbox/myscript.xml
+python3 agent/scripts/clipboard.py read agent/sandbox/output.xml
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `Windows Python not found` | Run `python.exe --version` from WSL to verify interop; ensure Python is in Windows PATH |
+| `Path conversion failed` | `wslpath` failed — check the file path exists in WSL |
+| `OpenClipboard failed` | Another app has the clipboard locked — close clipboard viewers or try again |
+| `No FileMaker objects found` | Copy something in FM first (`Ctrl+A`, `Ctrl+C` in Script Workspace) |
+| Format name not `XMSC`/`XMSS` | Run `discover` to find the real name, then use `--class <name>` |
