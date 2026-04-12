@@ -85,7 +85,6 @@ class TestCallWin:
     def test_on_wsl_uses_python_exe(self, monkeypatch):
         import clipboard
         monkeypatch.setattr(sys, 'platform', 'linux')
-        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
 
         def fake_check_output(cmd, **kw):
             if '-w' in cmd:
@@ -105,7 +104,6 @@ class TestCallWin:
     def test_on_wsl_raises_clear_error_when_python_exe_not_found(self, monkeypatch):
         import clipboard
         monkeypatch.setattr(sys, 'platform', 'linux')
-        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
 
         def fake_check_output(cmd, **kw):
             if '-w' in cmd:
@@ -120,7 +118,6 @@ class TestCallWin:
     def test_on_wsl_converts_posix_paths_to_windows(self, monkeypatch):
         import clipboard
         monkeypatch.setattr(sys, 'platform', 'linux')
-        monkeypatch.setattr(clipboard, '_is_wsl', lambda: True)
 
         converted = {}
 
