@@ -325,3 +325,40 @@ def discover() -> None:
             print(f"  ^ FileMaker format{label} *")
 
     print("\n* = Known FileMaker format — use this name with --class if needed")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description='FileMaker clipboard read/write for Windows (ctypes)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest='cmd')
+
+    sub.add_parser('discover', help='List custom clipboard formats — run after Ctrl+C in FM')
+
+    wp = sub.add_parser('write', help='Write XML file to clipboard as FM objects')
+    wp.add_argument('input', help='fmxmlsnippet XML file path')
+    wp.add_argument('--class', dest='cls', default=None,
+                    help='FM class override (default: auto-detect from XML)')
+
+    rp = sub.add_parser('read', help='Read FM objects from clipboard to XML file')
+    rp.add_argument('output', help='Output XML file path')
+
+    args = parser.parse_args()
+
+    if args.cmd == 'discover':
+        discover()
+    elif args.cmd == 'write':
+        write_to_clipboard(args.input, args.cls)
+    elif args.cmd == 'read':
+        read_from_clipboard(args.output)
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()

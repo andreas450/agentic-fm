@@ -411,3 +411,56 @@ class TestErrorHandling:
             clipboard_win.write_to_clipboard(self._xml_file(tmp_path))
 
         assert win_api['u32'].OpenClipboard.call_count == 2
+
+
+class TestCLI:
+    def test_write_command_dispatches_to_write_to_clipboard(self, monkeypatch, tmp_path):
+        import clipboard_win
+
+        xml = '<fmxmlsnippet><Step/></fmxmlsnippet>'
+        f = tmp_path / 'test.xml'
+        f.write_text(xml)
+
+        called = []
+        monkeypatch.setattr(clipboard_win, 'write_to_clipboard',
+                            lambda path, cls=None: called.append(('write', path, cls)))
+
+        monkeypatch.setattr(sys, 'argv', ['clipboard_win.py', 'write', str(f)])
+        clipboard_win.main()
+        assert called == [('write', str(f), None)]
+
+    def test_write_command_passes_class_override(self, monkeypatch, tmp_path):
+        import clipboard_win
+
+        f = tmp_path / 'test.xml'
+        f.write_text('<fmxmlsnippet/>')
+
+        called = []
+        monkeypatch.setattr(clipboard_win, 'write_to_clipboard',
+                            lambda path, cls=None: called.append(cls))
+
+        monkeypatch.setattr(sys, 'argv', ['clipboard_win.py', 'write', str(f), '--class', 'XMSC'])
+        clipboard_win.main()
+        assert called == ['XMSC']
+
+    def test_read_command_dispatches_to_read_from_clipboard(self, monkeypatch, tmp_path):
+        import clipboard_win
+
+        out = str(tmp_path / 'out.xml')
+        called = []
+        monkeypatch.setattr(clipboard_win, 'read_from_clipboard',
+                            lambda path: called.append(path))
+
+        monkeypatch.setattr(sys, 'argv', ['clipboard_win.py', 'read', out])
+        clipboard_win.main()
+        assert called == [out]
+
+    def test_discover_command_dispatches_to_discover(self, monkeypatch):
+        import clipboard_win
+
+        called = []
+        monkeypatch.setattr(clipboard_win, 'discover', lambda: called.append(True))
+
+        monkeypatch.setattr(sys, 'argv', ['clipboard_win.py', 'discover'])
+        clipboard_win.main()
+        assert called == [True]
