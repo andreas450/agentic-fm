@@ -36,6 +36,22 @@ import xml.etree.ElementTree as ET
 if sys.platform == 'win32':
     _user32 = ctypes.windll.user32    # type: ignore[attr-defined]
     _kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+
+    # Set correct return/arg types for pointer-sized values on 64-bit Windows.
+    # Without this ctypes defaults to c_int (32-bit), truncating 64-bit pointers.
+    _kernel32.GlobalAlloc.restype = ctypes.c_void_p
+    _kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+    _kernel32.GlobalLock.restype = ctypes.c_void_p
+    _kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+    _kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+    _kernel32.GlobalFree.restype = ctypes.c_void_p
+    _kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+    _kernel32.GlobalSize.restype = ctypes.c_size_t
+    _kernel32.GlobalSize.argtypes = [ctypes.c_void_p]
+    _user32.SetClipboardData.restype = ctypes.c_void_p
+    _user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+    _user32.GetClipboardData.restype = ctypes.c_void_p
+    _user32.GetClipboardData.argtypes = [ctypes.c_uint]
 else:
     # Non-Windows: set to None so the module is importable for testing.
     # Tests replace these via monkeypatch before calling any function.
