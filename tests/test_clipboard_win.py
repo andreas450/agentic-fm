@@ -105,20 +105,20 @@ class TestWriteToClipboard:
         import clipboard_win
         path, _ = self._make_xml_file(tmp_path)
         clipboard_win.write_to_clipboard(path)
-        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('XMSS')
+        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('Mac-XMSS')
 
     def test_registers_correct_format_for_xmsc(self, win_api, tmp_path):
         import clipboard_win
         xml = '<fmxmlsnippet><Script name="Test"/></fmxmlsnippet>'
         path, _ = self._make_xml_file(tmp_path, xml)
         clipboard_win.write_to_clipboard(path)
-        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('XMSC')
+        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('Mac-XMSC')
 
     def test_explicit_class_overrides_auto_detect(self, win_api, tmp_path):
         import clipboard_win
         path, _ = self._make_xml_file(tmp_path)  # XMSS by content
         clipboard_win.write_to_clipboard(path, cls='XMSC')
-        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('XMSC')
+        win_api['u32'].RegisterClipboardFormatW.assert_called_once_with('Mac-XMSC')
 
     def test_api_calls_in_correct_order(self, win_api, tmp_path):
         import clipboard_win

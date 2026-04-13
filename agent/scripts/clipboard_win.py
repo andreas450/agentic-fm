@@ -60,6 +60,11 @@ FM_CLASSES = {
     'XMTH': 'Theme',
 }
 
+# FileMaker on Windows registers clipboard formats with a "Mac-" prefix
+# (e.g. "Mac-XMSS" instead of "XMSS"). WIN_FM_CLASSES maps these names
+# to descriptions so they are recognised in discover/read.
+WIN_FM_CLASSES = {f'Mac-{k}': v for k, v in FM_CLASSES.items()}
+
 XML_ELEMENT_TO_CLASS = {
     'Step':           'XMSS',
     'Script':         'XMSC',
@@ -74,6 +79,18 @@ XML_ELEMENT_TO_CLASS = {
 }
 
 UT16_CLASSES = {'ut16'}
+
+
+def _win_format_name(cls: str) -> str:
+    """Return the Windows clipboard format name for a 4-letter FM class code.
+
+    FileMaker on Windows registers formats as "Mac-XXXX" (e.g. "Mac-XMSS").
+    ut16 (custom menus) is the exception — no prefix.
+    """
+    if cls in UT16_CLASSES:
+        return cls
+    return f'Mac-{cls}'
+
 
 # ---------------------------------------------------------------------------
 # Class detection (mirrors clipboard.py logic — kept local to avoid import chain)
@@ -173,6 +190,10 @@ def write_to_clipboard(input_path: str, cls: str | None = None) -> None:
     if cls is None:
         cls = detect_class_from_xml(xml_text)
 
+    # Strip "Mac-" prefix if the caller passed the Windows format name directly,
+    # then normalise to lower (ut16) or upper (4-letter codes) for internal use.
+    if cls.upper().startswith('MAC-'):
+        cls = cls[4:]
     cls = cls.lower() if cls.lower() in UT16_CLASSES else cls.upper()
 
     if cls in UT16_CLASSES:
@@ -182,12 +203,13 @@ def write_to_clipboard(input_path: str, cls: str | None = None) -> None:
     if cls not in FM_CLASSES:
         _fail(f"Unknown class '{cls}'. Valid options: {', '.join(FM_CLASSES)}")
 
-    format_id = _user32.RegisterClipboardFormatW(cls)
+    win_name = _win_format_name(cls)  # 'XMSS' → 'Mac-XMSS'
+    format_id = _user32.RegisterClipboardFormatW(win_name)
     if not format_id:
-        _fail(f"RegisterClipboardFormat('{cls}') failed (error {_last_error()})")
+        _fail(f"RegisterClipboardFormat('{win_name}') failed (error {_last_error()})")
 
     _write_bytes_to_clipboard(format_id, raw_bytes)
-    print(f"Clipboard ready → {input_path} as {cls} ({FM_CLASSES[cls]})", file=sys.stderr)
+    print(f"Clipboard ready → {input_path} as {win_name} ({FM_CLASSES[cls]})", file=sys.stderr)
 
 
 def _write_ut16_to_clipboard(xml_text: str, input_path: str) -> None:
@@ -244,7 +266,7 @@ def _detect_fm_format_on_clipboard() -> tuple | None:
             name_buf = ctypes.create_unicode_buffer(256)
             _user32.GetClipboardFormatNameW(fmt, name_buf, 256)
             name = name_buf.value
-            if name in FM_CLASSES or name in UT16_CLASSES:
+            if name in FM_CLASSES or name in WIN_FM_CLASSES or name in UT16_CLASSES:
                 return fmt, name
             fmt = _user32.EnumClipboardFormats(fmt)
     finally:
@@ -271,7 +293,7 @@ def read_from_clipboard(output_path: str) -> None:
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(xml)
 
-    label = FM_CLASSES.get(cls, cls)
+    label = FM_CLASSES.get(cls) or WIN_FM_CLASSES.get(cls, cls)
     print(f"Saved {cls} ({label}) to {output_path}", file=sys.stderr)
 
 
@@ -318,8 +340,9 @@ def discover() -> None:
     print(f"{'ID':<12} {'Name':<20} Preview")
     print('-' * 72)
     for fmt_id, name, preview in formats:
-        is_fm = name in FM_CLASSES or name in UT16_CLASSES
-        label = f" ({FM_CLASSES[name]})" if name in FM_CLASSES else (' (Menu)' if name in UT16_CLASSES else '')
+        is_fm = name in FM_CLASSES or name in WIN_FM_CLASSES or name in UT16_CLASSES
+        desc = FM_CLASSES.get(name) or WIN_FM_CLASSES.get(name) or ('Menu' if name in UT16_CLASSES else '')
+        label = f' ({desc})' if desc else ''
         print(f"0x{fmt_id:04X}{'':8} {name:<20} {preview}")
         if is_fm:
             print(f"  ^ FileMaker format{label} *")
