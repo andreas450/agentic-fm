@@ -264,6 +264,8 @@ def read_from_clipboard(output_path=None):
             sys.exit(1)
         if result.stdout:
             print(result.stdout, end='')
+        if result.stderr:
+            print(result.stderr, end='', file=sys.stderr)
         return
     # macOS path continues below — no changes needed
     cls = detect_clipboard_class()
