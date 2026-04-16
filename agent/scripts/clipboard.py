@@ -72,11 +72,15 @@ def _call_win(args: list) -> 'subprocess.CompletedProcess':
 
     win_args = []
     for a in args:
-        if a.startswith('/') and os.path.exists(a):
+        # Convert file-path-like arguments (contain '/', not a flag) to Windows paths.
+        # Resolve relative paths to absolute so wslpath works and python.exe writes
+        # to the correct WSL location even when the output file doesn't exist yet.
+        if '/' in a and not a.startswith('-'):
+            abs_a = os.path.abspath(a)
             try:
-                win_args.append(subprocess.check_output(['wslpath', '-w', a]).decode().strip())
+                win_args.append(subprocess.check_output(['wslpath', '-w', abs_a]).decode().strip())
             except subprocess.CalledProcessError:
-                print(f"ERROR: Path conversion failed for: {a}", file=sys.stderr)
+                print(f"ERROR: Path conversion failed for: {abs_a}", file=sys.stderr)
                 sys.exit(1)
         else:
             win_args.append(a)

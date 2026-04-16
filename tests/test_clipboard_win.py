@@ -138,13 +138,15 @@ class TestWriteToClipboard:
         import clipboard_win
         path, xml = self._make_xml_file(tmp_path)
         clipboard_win.write_to_clipboard(path)
-        expected_len = len(xml.encode('utf-8'))
+        raw = xml.encode('utf-8')
+        expected_len = 4 + len(raw)  # 4-byte LE size header + XML
         win_api['k32'].GlobalAlloc.assert_called_once_with(clipboard_win.GMEM_MOVEABLE, expected_len)
 
     def test_memmove_called_with_raw_utf8_bytes(self, win_api, tmp_path, monkeypatch):
         import clipboard_win
         path, xml = self._make_xml_file(tmp_path)
-        expected = xml.encode('utf-8')
+        raw = xml.encode('utf-8')
+        expected = len(raw).to_bytes(4, 'little') + raw  # 4-byte LE size header + XML
 
         captured = []
         monkeypatch.setattr(clipboard_win.ctypes, 'memmove',

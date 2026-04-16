@@ -224,7 +224,10 @@ def write_to_clipboard(input_path: str, cls: str | None = None) -> None:
     if not format_id:
         _fail(f"RegisterClipboardFormat('{win_name}') failed (error {_last_error()})")
 
-    _write_bytes_to_clipboard(format_id, raw_bytes)
+    # FileMaker on Windows expects a 4-byte little-endian size header before the XML.
+    # Without it FileMaker silently ignores the paste.
+    payload = len(raw_bytes).to_bytes(4, 'little') + raw_bytes
+    _write_bytes_to_clipboard(format_id, payload)
     print(f"Clipboard ready → {input_path} as {win_name} ({FM_CLASSES[cls]})", file=sys.stderr)
 
 
@@ -304,6 +307,13 @@ def read_from_clipboard(output_path: str) -> None:
     if cls in UT16_CLASSES:
         xml = data.decode('utf-16')
     else:
+        # FileMaker clipboard data may have a short binary prefix before the XML.
+        # Strip it so the saved file is clean, editable XML.
+        idx = data.find(b'<fmxmlsnippet')
+        if idx == -1:
+            idx = data.find(b'<?xml')
+        if idx > 0:
+            data = data[idx:]
         xml = data.decode('utf-8', errors='replace')
 
     with open(output_path, 'w', encoding='utf-8') as f:
