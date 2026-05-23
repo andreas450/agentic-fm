@@ -5130,7 +5130,7 @@
       },
       {
         "xmlElement": "Parameters",
-        "type": "complex",
+        "type": "parametersList",
         "hrLabel": "Parameters",
         "required": false,
         "note": "Contains Count attribute and one <P><Calculation/></P> child per parameter; Count must match number of <P> elements"
