@@ -6,12 +6,12 @@
     <UsePrintOptionsFromEnabled state="False"/>
     <SavePrintOptionsToEnabled state="False"/>
     <Restore state="False"/>
-    <UniversalPathList>$source_file</UniversalPathList>
+    <UniversalPathList>$path</UniversalPathList>
   </Step>
 </fmxmlsnippet>
 <!-- Prints a PDF file from a file path, container field, or variable. Encrypted PDF with missing/incorrect password returns error 607. Not on FileMaker Server / Cloud / Data API / CWP; partial on Go and WebDirect. -->
 <!-- NoInteract state: "True" = With dialog OFF (no print dialog); "False" = With dialog ON. -->
-<!-- File mode: <UniversalPathList>path</UniversalPathList> is the source path. Source mode (From: Source): use a <Field> container ref instead (form by analogy to Append/Open PDF — not captured). -->
+<!-- File mode: <UniversalPathList>$path</UniversalPathList> is the source path. Source mode (From: Source): use a <Field> container ref instead (form by analogy to Append/Open PDF — not captured). -->
 <!-- Restore / Option state: "True" when stored print options are attached (the <PrintSettings> block below appears). -->
 <!-- UsePrintOptionsFromEnabled state: "True" reads print options from a container — adds <PrintSettings><UsePrintOptionsFrom><Field>$referenced_print_options</Field></UsePrintOptionsFrom>…</PrintSettings>. -->
 <!-- SavePrintOptionsToEnabled state: "True" saves print options to a container — adds <PrintSettings><SavePrintOptionsTo><Field>$saved_print_options</Field></SavePrintOptionsTo>…</PrintSettings>. -->

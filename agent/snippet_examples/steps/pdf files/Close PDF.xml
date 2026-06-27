@@ -4,7 +4,7 @@
     <CreateDirectories state="False"/>
     <AutoOpen state="False"/>
     <CreateEmail state="False"/>
-    <UniversalPathList>$output</UniversalPathList>
+    <UniversalPathList>$path</UniversalPathList>
     <ClosePDFFile>
       <PDFSaveType>File</PDFSaveType>
     </ClosePDFFile>
@@ -12,7 +12,7 @@
 </fmxmlsnippet>
 <!-- Closes and saves the open PDF file to a file path, variable, or container field. -->
 <!-- PDFSaveType (the "Save to" selector): "File" saves to a file path; "Target" saves to a container field or variable. -->
-<!-- File mode: <UniversalPathList>path</UniversalPathList> holds the output path. CreateDirectories / AutoOpen / CreateEmail apply. -->
+<!-- File mode: <UniversalPathList>$path</UniversalPathList> holds the output path. CreateDirectories / AutoOpen / CreateEmail apply. -->
 <!-- Target mode: replace UniversalPathList with the container ref — <Text/><Field>$variable_target</Field> (variable) or <Text/><Field table="" id="0" name=""/> (field) — set <PDFSaveType>Target</PDFSaveType>, and optionally add a filename: <ClosePDFFile><PDFName><Calculation><![CDATA["filename"]]></Calculation></PDFName></ClosePDFFile>. -->
 <!-- CreateDirectories state: "True" creates new folders in the output path. AutoOpen state: "True" opens the saved file. CreateEmail state: "True" creates a new email with the PDF attached. (All File mode.) -->
 <!-- Required: PDFSaveType + its destination (UniversalPathList in File mode, or the <Field> container in Target mode). -->
