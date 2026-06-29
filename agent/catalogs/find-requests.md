@@ -64,6 +64,30 @@ Shared reference for the Query structure used by Enter Find Mode, Perform Find, 
 - **Restore** — HR shows "Restore" as a flag when `state="True"`; omitted when `state="False"`
 - **Find without indexes** — HR shows "Find without indexes" when `Option state="True"`; omitted when `state="False"`. Only available on Constrain Found Set.
 
+## HR Representation of the Query (converter grammar — G3)
+
+The converter renders the whole `<Query>` subtree as a single labelled HR parameter, `Find Requests: <value>` (the `findRequests` grammar primitive in `catalog_converter.cpp`).
+An absent or empty Query emits no parameter at all.
+
+The `<value>` grammar:
+
+- **Rows** (each `<RequestRow>`, OR-combined) are separated by ` | `.
+- A row prefixed `Omit ` is `operation="Exclude"` (omit matching records); otherwise `operation="Include"`.
+- **Criteria** within a row (AND-combined, same request) are separated by ` & `.
+- Each criterion is `<fieldref>: <text>` when field-scoped, or a bare `<text>` when field-less (FM's empty `<Field table="" id="0" name=""/>`).
+- `<fieldref>` is a `Table::Field` reference resolved through the active context; `<text>` is the literal search value, variable, or search-operator pattern, XML-escaped on emit.
+
+Examples:
+
+| HR | Meaning |
+|----|---------|
+| `Find Requests: $query` | one field-less request whose value is the variable `$query` |
+| `Find Requests: Customers::Name: Smith & Customers::City: NYC` | one request, two criteria (AND) |
+| `Find Requests: Customers::Status: Active \| Omit Customers::Status: Closed` | two requests (OR): find Active, omit Closed |
+| `Find Requests: >100` | field-less request using the `>` search operator |
+
+Known limitations (documented, rare in practice): a field-less search value containing a literal ` : ` (space-colon-space), ` | `, or ` & ` will be mis-split; the field `repetition` attribute is not yet modelled.
+
 ## Steps Using This Structure
 
 - Enter Find Mode — has Pause and Restore (no Option)
