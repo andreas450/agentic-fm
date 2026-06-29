@@ -2,51 +2,53 @@
 <fmxmlsnippet type="FMObjectList">
   <Step enable="True" id="87" name="Show Custom Dialog">
     <Title>
-      <Calculation><![CDATA[]]></Calculation>
+      <Calculation><![CDATA["Title"]]></Calculation>
     </Title>
     <Message>
-      <Calculation><![CDATA[]]></Calculation>
+      <Calculation><![CDATA["Message"]]></Calculation>
     </Message>
+    <Height>
+      <Calculation><![CDATA[100]]></Calculation>
+    </Height>
+    <Width>
+      <Calculation><![CDATA[300]]></Calculation>
+    </Width>
+    <DistanceFromTop>
+      <Calculation><![CDATA[200]]></Calculation>
+    </DistanceFromTop>
+    <DistanceFromLeft>
+      <Calculation><![CDATA[500]]></Calculation>
+    </DistanceFromLeft>
     <Buttons>
       <Button CommitState="True">
-        <Calculation><![CDATA[]]></Calculation>
+        <Calculation><![CDATA["Default Button"]]></Calculation>
       </Button>
       <Button CommitState="False">
-        <Calculation><![CDATA[]]></Calculation>
+        <Calculation><![CDATA["Button 2"]]></Calculation>
       </Button>
       <Button CommitState="False">
-        <Calculation><![CDATA[]]></Calculation>
+        <Calculation><![CDATA["Button 4"]]></Calculation>
       </Button>
     </Buttons>
     <InputFields>
-      <InputField UsePasswordCharacter="True">
-        <Field>$input</Field>
+      <InputField UsePasswordCharacter="False">
+        <Field table="Admin" id="17" name="Industry"/>
         <Label>
-          <Calculation><![CDATA[]]></Calculation>
+          <Calculation><![CDATA["Label 1"]]></Calculation>
         </Label>
       </InputField>
       <InputField UsePasswordCharacter="False">
-        <Field table="" id="0" name=""/>
+        <Field>$variable_input2</Field>
+        <Label>
+          <Calculation><![CDATA["Label 2"]]></Calculation>
+        </Label>
       </InputField>
-      <InputField UsePasswordCharacter="False">
-        <Field table="" id="0" name=""/>
+      <InputField UsePasswordCharacter="True">
+        <Field>$variable_input3</Field>
+        <Label>
+          <Calculation><![CDATA["Label 3"]]></Calculation>
+        </Label>
       </InputField>
     </InputFields>
   </Step>
 </fmxmlsnippet>
-<!-- Button CommitState attribute: "True" commits data from input fields to target field/variable when button is clicked. "False" does not commit data. When field is target and no fields active, data committed immediately; if field active, committed when record is committed. -->
-<!-- InputField UsePasswordCharacter attribute: "True" masks text as entered or displayed (using *). "False" shows text normally. Obscures display but does not alter actual stored data. -->
-<!-- Required: Title, Message. -->
-<!-- Optional: Buttons (up to 3; if all labels blank, OK button displays in lower-right), InputFields (up to 3; can be fields or variables; supports text, number, date, time, timestamp, container fields; variables store as text). -->
-<!-- Displays custom message dialog box with custom text and labels. Script pauses while dialog is displayed. -->
-<!-- Use Get(LastMessageChoice) to determine which button user pressed: 1 (first button, default OK), 2 (second button, default Cancel), 3 (third button). -->
-<!-- If input values don't match target field type, validation error message displays. User must resolve validation errors before closing dialog. -->
-<!-- Target fields don't need to appear on current layout (independent like Set Field step). -->
-<!-- Cannot insert data into calculation or summary fields. -->
-<!-- Ignores field entry options. -->
-<!-- Data entry limited by access privileges. To enable for all users, right-click script in scripts pane and choose Grant Full Access Privileges. -->
-<!-- Windows: can create keyboard shortcut for button by placing ampersand before shortcut key letter in label (e.g., &Done creates Alt+D). -->
-<!-- Consider user expectations before changing button's commit status in existing database. -->
-<!-- For more complex dialogs, use New Window script step. -->
-<!-- Not supported on Server, Cloud, Data API, or CWP. -->
-<!-- See https://help.claris.com/en/pro-help/content/show-custom-dialog.html -->
