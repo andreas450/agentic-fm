@@ -7,6 +7,19 @@ import { setupWebSocket } from './ws';
 import { getSettings, updateSettings } from './settings';
 import { streamChat } from './ai-proxy';
 
+/**
+ * Origins allowed to make requests to the API. The webviewer is served from
+ * localhost:8090 (also reachable as 127.0.0.1:8090), so legitimate same-origin
+ * requests — from a browser or from the FileMaker Web Viewer, which loads the
+ * SPA from this URL — carry one of these Origins. Any other Origin is a
+ * cross-origin caller and is rejected. Keep this in sync with the `port` in
+ * vite.config.ts.
+ */
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:8090',
+  'http://127.0.0.1:8090',
+]);
+
 /** Resolve the agent directory (sibling to webviewer/) */
 function agentDir(): string {
   // process.cwd() = webviewer/, agent/ is sibling
@@ -76,6 +89,30 @@ export function apiMiddleware(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
         const pathname = url.pathname;
+
+        // --- Same-origin (CSRF) guard ---
+        // The dev server binds to 127.0.0.1 only, but any web page open in a
+        // browser on THIS host can still issue cross-origin requests to
+        // localhost:8090. POST /api/chat spawns the `claude` CLI, so an
+        // unguarded cross-origin request is a same-host drive-by RCE vector.
+        // A browser always attaches an Origin header to cross-origin requests
+        // (and to same-origin non-GET requests) — including the literal "null"
+        // origin used by sandboxed iframes and data: URLs — so rejecting any
+        // request whose Origin is present but not in the localhost allowlist
+        // closes the browser attack surface (it also defeats DNS rebinding,
+        // since the rebound page keeps its original Origin). An absent Origin
+        // is allowed: a browser cannot suppress it on a POST, so a missing
+        // Origin only comes from a same-host non-browser client that already
+        // has local code execution. This is compatible with the SPA's mixed
+        // Content-Types (application/xml on validate/clipboard/sandbox), so it
+        // does not depend on the request body type.
+        const origin = req.headers.origin;
+        if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Cross-origin request rejected' }));
+          return;
+        }
 
         // --- GET /api/version ---
         if (req.method === 'GET' && pathname === '/api/version') {
