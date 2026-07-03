@@ -164,3 +164,6 @@ $RECYCLE.BIN/
 # Git
 *.orig
 *.rej
+FMS_2026-04-14_0000/
+FMS_*/
+docs/superpowers/

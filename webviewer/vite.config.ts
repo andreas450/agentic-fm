@@ -16,8 +16,8 @@ export default defineConfig({
     },
   },
   server: {
-    host: true,
-    port: 8080,
+    host: '127.0.0.1',
+    port: 8090,
     strictPort: true,
   },
   build: {
